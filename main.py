@@ -111,13 +111,13 @@ class CuratorAnalyzer:
                     # Calculate time between vote and reward
                     if 'timestamp' in vote_info and isinstance(vote_info['timestamp'], str):
                         try:
-                            
+                            combined_op['active_votes'] = comment['active_votes']
                             vesting_shares = float(combined_op['reward']['amount']) / (10 ** combined_op['reward']['precision'])
                             vote_value = self.calculate_vote_value(
                                 username, 
                                 vote_info['weight'], 
-                                effective_vests=vesting_shares
                             )
+                            combined_op['vote_value_steem'] = vote_value['steem_value']
                             combined_op['reward_sp'] = steem.vests_to_sp(vesting_shares)
                             vote_time = datetime.strptime(vote_info['timestamp'], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
                             combined_op['voted_after_minutes'] = (vote_time - created_post).total_seconds() / 60
@@ -171,7 +171,7 @@ class CuratorAnalyzer:
             p = (voting_power * weight / 10000 + 49) / 50
             
             # Step 7: Get reward fund con il nuovo metodo - utilizziamo blockchain_connector
-            reward_fund = steem.get_reward_fund("post")
+            reward_fund = self.get_reward_fund("post")
             
             # Step 8: Calculate rbPrc
             recent_claims = float(reward_fund['recent_claims'])
@@ -187,7 +187,7 @@ class CuratorAnalyzer:
             rb_prc = reward_balance / recent_claims
             
             # Step 9: Get median price con il nuovo metodo - utilizziamo blockchain_connector
-            price_info = steem.get_current_median_history_price()
+            price_info = self.get_current_median_history_price()
             
             base_amount = float(price_info['base']['amount'])
             quote_amount = float(price_info['quote']['amount'])
@@ -281,42 +281,96 @@ class CuratorAnalyzer:
         results = self.get_user_votes_by_days_back(username, days_back)
         self.format_results(results, username)
     
-    def test_vote_value(self, username="tasuboyz"):
-        """Test vote value calculation for a user"""
-        print(f"Testando il calcolo del valore del voto per {username}...")
+    def get_reward_fund(self, fund_name="post"):
+        for node_url in self.node_urls.get('steem'):
+            if not self.ping_server(node_url):
+                logger.error(f"Impossibile raggiungere il server: {node_url}")
+                continue
+        """Get reward fund information directly from the blockchain.
         
+        Args:
+            fund_name (str): Name of the reward fund, typically "post"
+            
+        Returns:
+            dict: Reward fund data with relevant information
+        """
         try:
-            # Test with 100% vote weight
-            vote_value = self.calculate_vote_value(username, 10000)  # 10000 = 100%
+            headers = {'Content-Type': 'application/json'}
+            payload = {
+                "jsonrpc": "2.0",
+                "method": "condenser_api.get_reward_fund",
+                "params": [fund_name],
+                "id": 1
+            }
             
-            if 'error' in vote_value:
-                print(f"Errore nel calcolo: {vote_value['error']}")
-                return
+            response = requests.post(node_url, json=payload, headers=headers, timeout=5)
             
-            print(f"\n=== CALCOLO VALORE VOTO PER {username.upper()} ===")
-            print(f"Voto al 100%:")
-            print(f"  - Valore in STEEM: {vote_value['steem_value']:.4f}")
-            print(f"  - Valore in USD/SBD: ${vote_value['sbd_value']:.4f}")
-            
-            # Show formula components
-            formula = vote_value.get('formula', {})
-            if formula:
-                print(f"\nComponenti della formula:")
-                print(f"  - R (SP ratio): {formula.get('r', 'N/A'):.6f}")
-                print(f"  - P (voting power): {formula.get('p', 'N/A'):.6f}")
-                print(f"  - Reward balance percentage: {formula.get('rb_prc', 'N/A'):.10f}")
-                print(f"  - STEEM/SBD rate: {formula.get('median', 'N/A'):.4f}")
-            
-            # Test different percentages
-            print(f"\nValori per diverse percentuali di voto:")
-            for percent in [25, 50, 75, 100]:
-                weight = percent * 100  # Convert to weight (25% = 2500, etc.)
-                test_value = self.calculate_vote_value(username, weight)
-                if 'error' not in test_value:
-                    print(f"  - {percent:3d}%: {test_value['steem_value']:6.4f} STEEM (${test_value['sbd_value']:6.4f})")
+            if response.status_code == 200:
+                result = response.json()
+                if 'result' in result:
+                    # Convert amounts to a more usable format
+                    reward_data = result['result']
+                    return reward_data
                     
+            logger.warning(f"Failed to get reward fund data from {node_url}")
+            # self.switch_to_backup_node()
+            return self.get_reward_fund(fund_name)  # Try again with new node
+            
         except Exception as e:
-            logger.error(f"Errore nel test del calcolo voto: {e}")
+            logger.error(f"Error getting reward fund: {str(e)}")
+            # self.switch_to_backup_node()
+            return self.get_reward_fund(fund_name)  # Try again with new node
+    
+    def get_current_median_history_price(self):
+        for node_url in self.node_urls.get('steem'):
+            if not self.ping_server(node_url):
+                logger.error(f"Impossibile raggiungere il server: {node_url}")
+                continue
+        """Get the current median price history from the blockchain.
+        
+        Returns:
+            dict: Price data with base and quote values
+        """
+        try:
+            headers = {'Content-Type': 'application/json'}
+            payload = {
+                "jsonrpc": "2.0",
+                "method": "condenser_api.get_current_median_history_price",
+                "params": [],
+                "id": 1
+            }
+            
+            response = requests.post(node_url, json=payload, headers=headers, timeout=5)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'result' in result:
+                    # Parse price data into a usable format
+                    price_data = result['result']
+                    
+                    # Convert price strings to structured data
+                    base_parts = price_data['base'].split(' ')
+                    quote_parts = price_data['quote'].split(' ')
+                    
+                    return {
+                        'base': {
+                            'amount': float(base_parts[0]),
+                            'symbol': base_parts[1]
+                        },
+                        'quote': {
+                            'amount': float(quote_parts[0]),
+                            'symbol': quote_parts[1]
+                        }
+                    }
+                    
+            logger.warning(f"Failed to get price data from {node_url}")
+            # self.switch_to_backup_node()
+            return self.get_current_median_history_price()  # Try again with new node
+            
+        except Exception as e:
+            logger.error(f"Error getting current median history price: {str(e)}")
+            # self.switch_to_backup_node()
+            return self.get_current_median_history_price()  # Try again with new node
 
 def main():
     """Main application entry point"""
@@ -346,7 +400,6 @@ def main():
         elif choice.lower().startswith('vote:'):
             # Vote value calculation test
             username = choice.split(':', 1)[1].strip() if ':' in choice else 'tasuboyz'
-            analyzer.test_vote_value(username)
         elif choice.lower() in ['s', 'si', 'yes', '']:
             username = input("Inserisci username del curator: ").strip()
             if username:
