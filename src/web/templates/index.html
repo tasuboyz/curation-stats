@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steem Curator Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            margin: 20px auto;
+            max-width: 1400px;
+        }
+        .header {
+            background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 15px 15px 0 0;
+            text-align: center;
+        }
+        .form-section {
+            padding: 2rem;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .results-section {
+            padding: 2rem;
+        }
+        .table-container {
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+        }
+        .table th {
+            position: sticky;
+            top: 0;
+            background: #343a40;
+            color: white;
+            border: none;
+            font-weight: 600;
+            font-size: 0.85rem;
+            padding: 0.5rem 0.3rem;
+        }
+        .table td {
+            font-size: 0.8rem;
+            padding: 0.4rem 0.3rem;
+            vertical-align: middle;
+        }
+        .efficiency-high { color: #28a745; font-weight: bold; }
+        .efficiency-medium { color: #ffc107; font-weight: bold; }
+        .efficiency-low { color: #dc3545; font-weight: bold; }
+        .stats-card {
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+        .btn-analyze {
+            background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+            border: none;
+            color: white;
+            font-weight: 600;
+            padding: 12px 30px;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+        }
+        .btn-analyze:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+            color: white;
+        }
+        .btn-export {
+            background: linear-gradient(45deg, #56ab2f 0%, #a8e6cf 100%);
+            border: none;
+            color: white;
+            font-weight: 600;
+            padding: 8px 20px;
+            border-radius: 20px;
+            margin-top: 10px;
+        }
+        .alert-custom {
+            border-radius: 10px;
+            border: none;
+        }
+        .permlink-cell {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .timestamp-cell {
+            min-width: 120px;
+            font-size: 0.75rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="main-container">
+            <!-- Header -->
+            <div class="header">
+                <h1><i class="fas fa-chart-line me-3"></i>Steem Curator Analyzer</h1>
+                <p class="mb-0">Analizza l'attività di curation e calcola l'efficienza dei voti</p>
+            </div>
+            
+            <!-- Form Section -->
+            <div class="form-section">
+                <form id="analyzeForm" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="username" class="form-label">
+                            <i class="fas fa-user me-2"></i>Username Curator
+                        </label>
+                        <input type="text" class="form-control" id="username" name="username" 
+                               value="tasuboyz" placeholder="es. tasuboyz" required>
+                        <div class="form-text">Username del curator da analizzare (3-16 caratteri)</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="days_back" class="form-label">
+                            <i class="fas fa-calendar me-2"></i>Giorni da Analizzare
+                        </label>
+                        <input type="number" class="form-control" id="days_back" name="days_back" 
+                               value="7" min="1" max="365" required>
+                        <div class="form-text">Numero di giorni da analizzare (1-365)</div>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-analyze w-100">
+                            <i class="fas fa-search me-2"></i>Analizza Curator
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Loading Section -->
+            <div id="loading" class="loading">
+                <div class="spinner-border text-primary me-3" role="status"></div>
+                <span>Analizzando dati del curator...</span>
+            </div>
+            
+            <!-- Alert Section -->
+            <div id="alertContainer"></div>
+            
+            <!-- Results Section -->
+            <div id="resultsSection" class="results-section" style="display: none;">
+                <!-- Statistics Cards -->
+                <div id="statisticsCards" class="row mb-4"></div>
+                
+                <!-- Export Button -->
+                <div class="text-end mb-3">
+                    <button id="exportBtn" class="btn btn-export">
+                        <i class="fas fa-download me-2"></i>Esporta CSV
+                    </button>
+                </div>
+                
+                <!-- Data Table -->
+                <div class="table-container">
+                    <table class="table table-striped table-hover mb-0">                        <thead>
+                            <tr>
+                                <th>Data/Ora</th>
+                                <th>Curator</th>
+                                <th>Autore</th>
+                                <th>Permlink</th>
+                                <th>Reward SP</th>
+                                <th>Peso Voto %</th>
+                                <th>Valore Voto</th>
+                                <th>Minuti Post</th>
+                                <th>Efficienza</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dataTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentData = null;
+        let currentUsername = null;
+        let currentDaysBack = null;
+        
+        document.getElementById('analyzeForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const daysBack = parseInt(document.getElementById('days_back').value);
+            
+            if (!username || daysBack < 1 || daysBack > 365) {
+                showAlert('Inserisci parametri validi', 'warning');
+                return;
+            }
+            
+            analyzeData(username, daysBack);
+        });
+        
+        function analyzeData(username, daysBack) {
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'none';
+            document.getElementById('alertContainer').innerHTML = '';
+            
+            // Make API call
+            const formData = new FormData();
+            formData.append('username', username);
+            formData.append('days_back', daysBack);
+            
+            fetch('/analyze', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.success) {
+                    currentData = data.data;
+                    currentUsername = data.username;
+                    currentDaysBack = data.days_back;
+                    
+                    displayResults(data);
+                    showAlert(`Analisi completata: ${data.data.length} operazioni trovate`, 'success');
+                } else {
+                    showAlert(data.error || 'Errore durante l\'analisi', 'danger');
+                }
+            })
+            .catch(error => {
+                document.getElementById('loading').style.display = 'none';
+                showAlert('Errore di connessione: ' + error.message, 'danger');
+            });
+        }
+        
+        function displayResults(data) {
+            // Display statistics
+            displayStatistics(data.statistics);
+            
+            // Display data table
+            displayDataTable(data.data);
+            
+            // Show results section
+            document.getElementById('resultsSection').style.display = 'block';
+        }
+        
+        function displayStatistics(stats) {
+            const container = document.getElementById('statisticsCards');
+            container.innerHTML = `
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <h6><i class="fas fa-list me-2"></i>Operazioni Totali</h6>
+                        <h4>${stats.total_operations}</h4>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <h6><i class="fas fa-vote-yea me-2"></i>Con Voti</h6>
+                        <h4>${stats.operations_with_votes} (${stats.match_percentage})</h4>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <h6><i class="fas fa-coins me-2"></i>Reward Totale SP</h6>
+                        <h4>${stats.total_reward_sp}</h4>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <h6><i class="fas fa-percentage me-2"></i>Efficienza Media</h6>
+                        <h4>${stats.average_efficiency}</h4>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function displayDataTable(data) {
+            const tbody = document.getElementById('dataTableBody');
+            tbody.innerHTML = '';
+            
+            data.forEach(row => {
+                const efficiency = parseFloat(row.efficiency.replace('%', ''));
+                let efficiencyClass = 'efficiency-low';
+                if (efficiency >= 80) efficiencyClass = 'efficiency-high';
+                else if (efficiency >= 50) efficiencyClass = 'efficiency-medium';
+                  const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="timestamp-cell">${formatTimestamp(row.timestamp)}</td>
+                    <td>${row.curator}</td>
+                    <td>${row.comment_author}</td>
+                    <td class="permlink-cell" title="${row.comment_permlink}">${row.comment_permlink}</td>
+                    <td>${row.reward_sp}</td>
+                    <td>${row.vote_weight_percent}</td>
+                    <td>${row.vote_value_steem}</td>
+                    <td>${row.voted_after_minutes}</td>
+                    <td class="${efficiencyClass}">${row.efficiency}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        function formatTimestamp(timestamp) {
+            if (timestamp === 'N/A') return timestamp;
+            try {
+                const date = new Date(timestamp);
+                return date.toLocaleString('it-IT', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch (e) {
+                return timestamp;
+            }
+        }
+        
+        function showAlert(message, type) {
+            const container = document.getElementById('alertContainer');
+            container.innerHTML = `
+                <div class="alert alert-${type} alert-custom alert-dismissible fade show mx-4" role="alert">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : 'exclamation-circle'} me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+        }
+        
+        // Export functionality
+        document.getElementById('exportBtn').addEventListener('click', function() {
+            if (!currentUsername || !currentDaysBack) {
+                showAlert('Nessun dato da esportare', 'warning');
+                return;
+            }
+            
+            const url = `/export_csv?username=${encodeURIComponent(currentUsername)}&days_back=${currentDaysBack}`;
+            window.open(url, '_blank');
+        });
+        
+        // Auto-analyze on page load with default values
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                analyzeData('tasuboyz', 7);
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

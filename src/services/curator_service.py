@@ -9,9 +9,9 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 from beem.comment import Comment
 
-from ..network.steem_connector import SteemConnector
-from ..services.vote_calculator import VoteCalculator
-from ..config.settings import (
+from network.steem_connector import SteemConnector
+from services.vote_calculator import VoteCalculator
+from config.settings import (
     DEFAULT_BATCH_SIZE, 
     VOTE_BUFFER_DAYS,
     MESSAGES

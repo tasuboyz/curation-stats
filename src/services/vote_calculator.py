@@ -7,8 +7,8 @@ Handles calculation of vote values based on Steem blockchain parameters
 import logging
 from typing import Dict, Any, Optional
 
-from ..network.steem_connector import SteemConnector
-from ..config.settings import DEFAULT_VOTING_POWER, API_ENDPOINTS
+from network.steem_connector import SteemConnector
+from config.settings import DEFAULT_VOTING_POWER, API_ENDPOINTS
 
 logger = logging.getLogger(__name__)
 

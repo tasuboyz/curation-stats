@@ -7,11 +7,11 @@ Main class that coordinates all services for curator analysis
 import logging
 from typing import List, Dict, Any, Optional
 
-from ..network.steem_connector import SteemConnector
-from ..services.curator_service import CuratorService
-from ..services.vote_calculator import VoteCalculator
-from ..utils.formatters import ResultFormatter
-from ..config.settings import DEFAULT_USERNAME, DEFAULT_DAYS_BACK, STEEM_NODES
+from network.steem_connector import SteemConnector
+from services.curator_service import CuratorService
+from services.vote_calculator import VoteCalculator
+from utils.formatters import ResultFormatter
+from config.settings import DEFAULT_USERNAME, DEFAULT_DAYS_BACK, STEEM_NODES
 
 logger = logging.getLogger(__name__)
 

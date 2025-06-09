@@ -8,7 +8,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from tabulate import tabulate
 
-from ..config.settings import (
+from config.settings import (
     TABLE_FORMAT, 
     MAX_PERMLINK_LENGTH, 
     MESSAGES

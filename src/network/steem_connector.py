@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any
 from beem import Steem
 from beem.account import Account
 
-from ..config.settings import STEEM_NODES, DEFAULT_TIMEOUT
+from config.settings import STEEM_NODES, DEFAULT_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
