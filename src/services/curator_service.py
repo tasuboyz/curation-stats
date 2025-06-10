@@ -76,12 +76,28 @@ class CuratorService:
         
         while still_in_range and start_from > stop:
             batch_stop = max(0, start_from - batch_size)
-            operations = list(account.history_reverse(
-                start=start_from, 
-                stop=batch_stop, 
-                use_block_num=False
-            ))
-            
+            try:
+                operations = list(account.history_reverse(
+                    start=start_from, 
+                    stop=batch_stop, 
+                    use_block_num=False
+                ))
+            except Exception as e:
+                logger.warning(f"Errore RPC: {e}. Provo a cambiare nodo...")
+                # Prova a cambiare nodo
+                if hasattr(self.connector, "switch_node"):
+                    switched = self.connector.switch_node()
+                    if switched:
+                        account = self.connector.get_account(username)
+                        steem = self.connector.get_steem_instance()
+                        continue  # Riprova il batch con il nuovo nodo
+                    else:
+                        logger.error("Nessun nodo funzionante disponibile.")
+                        break
+                else:
+                    logger.error("Funzione di switch nodo non disponibile.")
+                    break
+
             # Process batch of operations
             for op in operations:
                 op_timestamp = self._parse_timestamp(op.get('timestamp'))
@@ -143,6 +159,12 @@ class CuratorService:
                     )
                     created_post = comment['created']
                     combined_op['active_votes'] = comment['active_votes']
+
+                    # Ordina active_votes per rshares decrescente
+                    if isinstance(combined_op['active_votes'], list):
+                        combined_op['active_votes'].sort(
+                            key=lambda v: v.get('rshares', 0), reverse=True
+                        )
                     
                     # Calculate reward in SP
                     vesting_shares = float(combined_op['reward']['amount']) / (
@@ -169,7 +191,15 @@ class CuratorService:
                             combined_op['days_to_reward'] = (
                                 reward_time - vote_time
                             ).total_seconds() / 86400
-                            
+
+                    # Calcolo efficienza
+                    reward_sp = combined_op.get('reward_sp')
+                    vote_value_steem = combined_op.get('vote_value_steem')
+                    if reward_sp is not None and vote_value_steem and vote_value_steem > 0:
+                        combined_op['efficiency'] = round((reward_sp / vote_value_steem) * 100, 2)
+                    else:
+                        combined_op['efficiency'] = None
+                
                 except (ValueError, TypeError, Exception) as e:
                     logger.debug(f"Error enriching operation data: {e}")
             

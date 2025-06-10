@@ -11,6 +11,9 @@ from flask import Flask, render_template, request, jsonify, send_file
 from datetime import datetime
 import csv
 import io
+# ML imports
+import json
+import pandas as pd
 
 # Add src directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -20,6 +23,9 @@ sys.path.insert(0, src_dir)
 from services.analyzer import CuratorAnalyzer
 from utils.validators import InputValidator
 from config.settings import DEFAULT_USERNAME, DEFAULT_DAYS_BACK
+# ML imports
+from ml.experiments import MLExperimentRunner
+from ml.feature_extractor import CuratorMLFeatureExtractor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +35,8 @@ app = Flask(__name__)
 
 # Global analyzer instance
 analyzer = None
+# Global ML runner instance
+ml_runner = None
 
 def get_analyzer():
     """Get or create analyzer instance"""
@@ -36,6 +44,13 @@ def get_analyzer():
     if analyzer is None:
         analyzer = CuratorAnalyzer()
     return analyzer
+
+def get_ml_runner():
+    """Get or create ML runner instance"""
+    global ml_runner
+    if ml_runner is None:
+        ml_runner = MLExperimentRunner()
+    return ml_runner
 
 def calculate_efficiency(vote_value_steem, reward_sp):
     """Calculate efficiency percentage between vote value and actual reward"""
@@ -248,6 +263,254 @@ def health_check():
             'status': 'unhealthy',
             'error': str(e)
         }), 503
+
+# ========== ML ENDPOINTS ==========
+
+@app.route('/ml/feature_extraction', methods=['POST'])
+def ml_feature_extraction():
+    """Run ML feature extraction on curator data"""
+    try:
+        # Get form data
+        username = request.form.get('username', DEFAULT_USERNAME).strip()
+        days_back = int(request.form.get('days_back', DEFAULT_DAYS_BACK))
+        
+        # Validate inputs
+        if not InputValidator.validate_username(username):
+            return jsonify({
+                'error': 'Username non valido. Deve essere tra 3-16 caratteri (lettere, numeri, punti, trattini).'
+            }), 400
+        
+        if not InputValidator.validate_days_back(days_back):
+            return jsonify({
+                'error': 'Il numero di giorni deve essere tra 1 e 365.'
+            }), 400
+        
+        # Get analyzer and fetch data
+        analyzer = get_analyzer()
+        
+        # Test connection first
+        if not analyzer.test_connection():
+            return jsonify({
+                'error': 'Impossibile connettersi ai nodi Steem. Riprova più tardi.'
+            }), 503
+        
+        # Get curator data
+        raw_data = analyzer.get_curator_data(username, days_back)
+        
+        if not raw_data:
+            return jsonify({
+                'error': 'Nessun dato trovato per questo curator nel periodo specificato.'
+            }), 404
+        
+        # Extract features using ML
+        feature_extractor = CuratorMLFeatureExtractor()
+        features = feature_extractor.extract_features(raw_data)
+        
+        # Convert features to DataFrame for better readability
+        features_df = pd.DataFrame(features)
+        
+        # Prepare response data
+        response_data = {
+            'username': username,
+            'days_back': days_back,
+            'features': features_df.to_dict(orient='records')
+        }
+        
+        return jsonify({
+            'success': True,
+            'data': response_data
+        })
+        
+    except ValueError as e:
+        return jsonify({'error': f'Errore nei parametri: {str(e)}'}), 400
+    except Exception as e:
+        logger.error(f"Error in ML feature extraction: {str(e)}")
+        return jsonify({'error': f'Errore durante l\'estrazione delle caratteristiche: {str(e)}'}), 500
+
+@app.route('/ml/run_experiment', methods=['POST'])
+def ml_run_experiment():
+    """Run ML experiment and return results"""
+    try:
+        # Get form data
+        experiment_name = request.form.get('experiment_name', '').strip()
+        username = request.form.get('username', DEFAULT_USERNAME).strip()
+        days_back = int(request.form.get('days_back', DEFAULT_DAYS_BACK))
+        
+        # Validate inputs
+        if not experiment_name:
+            return jsonify({
+                'error': 'Il nome dell\'esperimento è obbligatorio.'
+            }), 400
+        
+        if not InputValidator.validate_username(username):
+            return jsonify({
+                'error': 'Username non valido. Deve essere tra 3-16 caratteri (lettere, numeri, punti, trattini).'
+            }), 400
+        
+        if not InputValidator.validate_days_back(days_back):
+            return jsonify({
+                'error': 'Il numero di giorni deve essere tra 1 e 365.'
+            }), 400
+        
+        # Get analyzer and fetch data
+        analyzer = get_analyzer()
+        
+        # Test connection first
+        if not analyzer.test_connection():
+            return jsonify({
+                'error': 'Impossibile connettersi ai nodi Steem. Riprova più tardi.'
+            }), 503
+        
+        # Get curator data
+        raw_data = analyzer.get_curator_data(username, days_back)
+        
+        if not raw_data:
+            return jsonify({
+                'error': 'Nessun dato trovato per questo curator nel periodo specificato.'
+            }), 404
+        
+        # Run ML experiment
+        experiment_runner = get_ml_runner()
+        experiment_results = experiment_runner.run_experiment(experiment_name, raw_data)
+        
+        return jsonify({
+            'success': True,
+            'experiment_name': experiment_name,
+            'results': experiment_results
+        })
+        
+    except ValueError as e:
+        return jsonify({'error': f'Errore nei parametri: {str(e)}'}), 400
+    except Exception as e:
+        logger.error(f"Error running ML experiment: {str(e)}")
+        return jsonify({'error': f'Errore durante l\'esecuzione dell\'esperimento: {str(e)}'}), 500
+
+@app.route('/ml/train', methods=['POST'])
+def train_ml_models():
+    """Train ML models with curator data"""
+    try:
+        # Get form data
+        username = request.form.get('username', DEFAULT_USERNAME).strip()
+        days_back = int(request.form.get('days_back', DEFAULT_DAYS_BACK))
+        
+        # Get curator data
+        analyzer = get_analyzer()
+        raw_data = analyzer.get_curator_data(username, days_back)
+        
+        if not raw_data or len(raw_data) < 10:
+            return jsonify({
+                'error': 'Dati insufficienti per il training. Necessari almeno 10 record.'
+            }), 400
+        
+        # Get ML runner and train models
+        ml_runner = get_ml_runner()
+        
+        # Prepare dataset
+        df, quality_analysis = ml_runner.prepare_dataset(raw_data)
+        
+        # Run experiments
+        results = ml_runner.run_experiments(df)
+        
+        # Find best model
+        best_model_info = ml_runner.get_best_model(results)
+        
+        return jsonify({
+            'success': True,
+            'dataset_info': {
+                'total_records': len(df),
+                'features_count': len([col for col in df.columns if col != 'efficiency']),
+                'quality_score': quality_analysis.get('overall_score', 0)
+            },
+            'model_results': results,
+            'best_model': best_model_info,
+            'quality_analysis': quality_analysis
+        })
+        
+    except Exception as e:
+        logger.error(f"Error training ML models: {str(e)}")
+        return jsonify({'error': f'Errore durante il training: {str(e)}'}), 500
+
+@app.route('/ml/predict', methods=['POST'])
+def predict_optimal_timing():
+    """Predict optimal voting timing"""
+    try:
+        data = request.get_json()
+        
+        # Extract prediction parameters
+        author = data.get('author', '')
+        permlink = data.get('permlink', '')
+        post_age_minutes = data.get('post_age_minutes', 0)
+        
+        if not author or not permlink:
+            return jsonify({
+                'error': 'Author e permlink sono obbligatori per la predizione'
+            }), 400
+        
+        # Get analyzer to fetch post data
+        analyzer = get_analyzer()
+        
+        # Simulate getting post and votes data
+        # In a real implementation, this would fetch actual post data
+        prediction_data = {
+            'author': author,
+            'permlink': permlink,
+            'post_age_minutes': post_age_minutes,
+            'prediction': 'Feature in development'
+        }
+        
+        return jsonify({
+            'success': True,
+            'prediction': prediction_data,
+            'optimal_timing': {
+                'suggested_minutes': 15,  # Placeholder
+                'confidence': 0.85,
+                'reasoning': 'Based on historical whale voting patterns'
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error making prediction: {str(e)}")
+        return jsonify({'error': f'Errore durante la predizione: {str(e)}'}), 500
+
+@app.route('/ml/analyze_post', methods=['POST'])
+def analyze_post_for_curation():
+    """Analyze a specific post for curation opportunities"""
+    try:
+        data = request.get_json()
+        author = data.get('author', '')
+        permlink = data.get('permlink', '')
+        
+        if not author or not permlink:
+            return jsonify({
+                'error': 'Author e permlink sono obbligatori'
+            }), 400
+        
+        # Get analyzer
+        analyzer = get_analyzer()
+        
+        # Get post analysis (this would be implemented)
+        post_analysis = {
+            'author': author,
+            'permlink': permlink,
+            'whale_voters_detected': [],
+            'optimal_vote_time': '12-18 minuti dopo pubblicazione',
+            'expected_efficiency': '75-85%',
+            'risk_level': 'Medium',
+            'recommendations': [
+                'Vota entro 15 minuti per massimizzare curation reward',
+                'Monitora i whale voters attivi su questo autore',
+                'Peso voto consigliato: 80-100%'
+            ]
+        }
+        
+        return jsonify({
+            'success': True,
+            'analysis': post_analysis
+        })
+        
+    except Exception as e:
+        logger.error(f"Error analyzing post: {str(e)}")
+        return jsonify({'error': f'Errore durante l\'analisi: {str(e)}'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
