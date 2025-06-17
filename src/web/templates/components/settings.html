@@ -1,0 +1,51 @@
+<!-- Settings Component -->
+<div class="form-section">
+    <h4><i class="fas fa-cog me-2"></i>Impostazioni</h4>
+    <p class="text-muted">Configura le opzioni per l'analisi delle curation</p>
+    
+    <form id="settingsForm" class="row g-3">
+        <div class="col-md-6">
+            <label for="connection_timeout" class="form-label">
+                <i class="fas fa-stopwatch me-2"></i>Timeout Connessione (secondi)
+            </label>
+            <input type="number" class="form-control" id="connection_timeout" name="connection_timeout" 
+                   value="30" min="10" max="120">
+        </div>
+        
+        <div class="col-md-6">
+            <label for="nodes_selection" class="form-label">
+                <i class="fas fa-server me-2"></i>Selezione Nodi
+            </label>
+            <select class="form-select" id="nodes_selection" name="nodes_selection">
+                <option value="auto">Automatica (consigliata)</option>
+                <option value="moecki">Moecki</option>
+                <option value="steemit">Steemit</option>
+                <option value="justyy">JustYY</option>
+            </select>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="form-check form-switch mt-4">
+                <input class="form-check-input" type="checkbox" id="enable_caching" checked>
+                <label class="form-check-label" for="enable_caching">
+                    <i class="fas fa-database me-2"></i>Abilita caching dati
+                </label>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="form-check form-switch mt-4">
+                <input class="form-check-input" type="checkbox" id="dark_mode">
+                <label class="form-check-label" for="dark_mode">
+                    <i class="fas fa-moon me-2"></i>Modalità scura
+                </label>
+            </div>
+        </div>
+        
+        <div class="col-12 mt-4">
+            <button type="submit" class="btn btn-analyze">
+                <i class="fas fa-save me-2"></i>Salva Impostazioni
+            </button>
+        </div>
+    </form>
+</div>

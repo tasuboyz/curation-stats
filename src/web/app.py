@@ -7,7 +7,7 @@ Provides a web interface to analyze curator data with detailed tables
 import sys
 import os
 import logging
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, url_for
 from datetime import datetime
 import csv
 import io
@@ -27,7 +27,10 @@ from config.settings import DEFAULT_USERNAME, DEFAULT_DAYS_BACK
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+# Initialize Flask app with static folder configuration
+app = Flask(__name__, 
+            static_folder='static',
+            template_folder='templates')
 
 # Global analyzer instance
 analyzer = None
@@ -250,6 +253,11 @@ def health_check():
             'status': 'unhealthy',
             'error': str(e)
         }), 503
+
+@app.route('/settings')
+def settings():
+    """Settings page"""
+    return render_template('settings.html')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

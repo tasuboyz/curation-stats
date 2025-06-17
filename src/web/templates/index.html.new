@@ -1,0 +1,26 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Steem Curator Analyzer{% endblock %}
+
+{% block content %}
+<div class="tab-content" id="mainTabsContent">
+    <!-- Analysis Panel -->
+    <div class="tab-pane fade show active" id="analysis-panel" role="tabpanel">
+        {% include 'components/analysis_form.html' %}
+        {% include 'components/results_table.html' %}
+    </div>
+    
+    <!-- Settings Panel -->
+    <div class="tab-pane fade" id="settings-panel" role="tabpanel">
+        {% include 'components/settings.html' %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Steem Curator Analyzer initialized');
+    });
+</script>
+{% endblock %}

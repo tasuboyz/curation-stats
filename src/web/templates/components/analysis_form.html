@@ -1,0 +1,26 @@
+<!-- Analysis Form Component -->
+<div class="form-section">
+    <form id="analyzeForm" class="row g-3">
+        <div class="col-md-4">
+            <label for="username" class="form-label">
+                <i class="fas fa-user me-2"></i>Username Curator
+            </label>
+            <input type="text" class="form-control" id="username" name="username" 
+                   value="tasuboyz" placeholder="es. tasuboyz" required>
+            <div class="form-text">Username del curator da analizzare (3-16 caratteri)</div>
+        </div>
+        <div class="col-md-4">
+            <label for="days_back" class="form-label">
+                <i class="fas fa-calendar me-2"></i>Giorni da Analizzare
+            </label>
+            <input type="number" class="form-control" id="days_back" name="days_back" 
+                   value="7" min="1" max="365" required>
+            <div class="form-text">Numero di giorni da analizzare (1-365)</div>
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+            <button type="submit" class="btn btn-analyze w-100">
+                <i class="fas fa-search me-2"></i>Analizza Curator
+            </button>
+        </div>
+    </form>
+</div>
