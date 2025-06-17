@@ -107,6 +107,32 @@
             font-size: 0.75rem;
         }
         
+        /* Sortable Table Styles */
+        .sortable {
+            cursor: pointer;
+            position: relative;
+            padding-right: 20px !important;
+        }
+        .sortable:hover {
+            background-color: #2d3338;
+        }
+        .sort-icon {
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #adb5bd;
+            font-size: 0.8rem;
+        }
+        th.sort-asc .sort-icon {
+            color: #fff;
+            content: '\f0de';
+        }
+        th.sort-desc .sort-icon {
+            color: #fff;
+            content: '\f0dd';
+        }
+        
         /* ML Specific Styles */
         .nav-pills .nav-link {
             background: rgba(255, 255, 255, 0.2);
@@ -223,21 +249,20 @@
                                 <i class="fas fa-download me-2"></i>Esporta CSV
                             </button>
                         </div>
-                        
-                        <!-- Data Table -->
+                          <!-- Data Table -->
                         <div class="table-container">
                             <table class="table table-striped table-hover mb-0">
                                 <thead>
                                     <tr>
-                                        <th>Data/Ora</th>
-                                        <th>Curator</th>
-                                        <th>Autore</th>
-                                        <th>Permlink</th>
-                                        <th>Reward SP</th>
-                                        <th>Peso Voto %</th>
-                                        <th>Valore Voto</th>
-                                        <th>Minuti Post</th>
-                                        <th>Efficienza</th>
+                                        <th class="sortable" data-sort="timestamp">Data/Ora <i class="sort-icon fas fa-sort"></i></th>
+                                        <th class="sortable" data-sort="curator">Curator <i class="sort-icon fas fa-sort"></i></th>
+                                        <th class="sortable" data-sort="comment_author">Autore <i class="sort-icon fas fa-sort"></i></th>
+                                        <th class="sortable" data-sort="comment_permlink">Permlink <i class="sort-icon fas fa-sort"></i></th>
+                                        <th class="sortable" data-sort="reward_sp">Reward SP <i class="sort-icon fas fa-sort"></i></th>
+                                        <th class="sortable" data-sort="vote_weight_percent">Peso Voto % <i class="sort-icon fas fa-sort"></i></th>
+                                        <th class="sortable" data-sort="vote_value_steem">Valore Voto <i class="sort-icon fas fa-sort"></i></th>
+                                        <th class="sortable" data-sort="voted_after_minutes">Minuti Post <i class="sort-icon fas fa-sort"></i></th>
+                                        <th class="sortable" data-sort="efficiency">Efficienza <i class="sort-icon fas fa-sort"></i></th>
                                     </tr>
                                 </thead>
                                 <tbody id="dataTableBody">
@@ -330,9 +355,8 @@
         </div>
     </div>
     
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        let currentData = null;
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>    <script>
+        let currentData = [];
         let currentUsername = null;
         let currentDaysBack = null;
         
@@ -426,17 +450,22 @@
                 </div>
             `;
         }
-        
-        function displayDataTable(data) {
+          function displayDataTable(data) {
             const tbody = document.getElementById('dataTableBody');
             tbody.innerHTML = '';
+            
+            // Update currentData reference for sorting
+            if (data !== currentData) {
+                currentData = data;
+            }
             
             data.forEach(row => {
                 const efficiency = parseFloat(row.efficiency.replace('%', ''));
                 let efficiencyClass = 'efficiency-low';
                 if (efficiency >= 80) efficiencyClass = 'efficiency-high';
                 else if (efficiency >= 50) efficiencyClass = 'efficiency-medium';
-                  const tr = document.createElement('tr');
+                
+                const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="timestamp-cell">${formatTimestamp(row.timestamp)}</td>
                     <td>${row.curator}</td>
@@ -671,7 +700,82 @@
             
             document.getElementById('predictionResults').style.display = 'block';
         }
+          // Table Sorting Functionality
+        let currentSortColumn = null;
+        let currentSortDirection = 'asc';
+        let originalData = [];
         
+        // Add event listeners to sortable headers
+        document.querySelectorAll('th.sortable').forEach(header => {
+            header.addEventListener('click', function() {
+                const sortKey = this.getAttribute('data-sort');
+                sortTable(sortKey);
+            });
+        });
+        
+        function sortTable(sortKey) {
+            // Toggle sort direction if clicking on the same column
+            if (currentSortColumn === sortKey) {
+                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortColumn = sortKey;
+                currentSortDirection = 'asc';
+            }
+            
+            // Update header classes to show sort direction
+            document.querySelectorAll('th.sortable').forEach(header => {
+                header.classList.remove('sort-asc', 'sort-desc');
+                
+                const icon = header.querySelector('.sort-icon');
+                icon.className = 'sort-icon fas fa-sort';
+                
+                if (header.getAttribute('data-sort') === sortKey) {
+                    header.classList.add(currentSortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+                    icon.className = `sort-icon fas fa-sort-${currentSortDirection === 'asc' ? 'up' : 'down'}`;
+                }
+            });
+            
+            // Sort the data
+            const sortedData = [...currentData].sort((a, b) => {
+                let valA = a[sortKey];
+                let valB = b[sortKey];
+                
+                // Handle special cases for comparison
+                if (sortKey === 'reward_sp' || sortKey === 'vote_value_steem' || 
+                    sortKey === 'vote_weight_percent' || sortKey === 'voted_after_minutes') {
+                    // Convert to float for numerical comparison
+                    valA = parseFloat(valA) || 0;
+                    valB = parseFloat(valB) || 0;
+                } else if (sortKey === 'efficiency') {
+                    // Extract percentage value
+                    valA = parseFloat(valA.replace('%', '')) || 0;
+                    valB = parseFloat(valB.replace('%', '')) || 0;
+                } else if (sortKey === 'timestamp') {
+                    // Date comparison
+                    valA = new Date(valA);
+                    valB = new Date(valB);
+                }
+                
+                // Compare based on direction
+                if (valA === valB) return 0;
+                if (currentSortDirection === 'asc') {
+                    return valA > valB ? 1 : -1;
+                } else {
+                    return valA < valB ? 1 : -1;
+                }
+            });
+            
+            // Re-display table with sorted data
+            displayDataTable(sortedData);
+        }
+        
+        // Modify displayResults to store originalData
+        const originalDisplayResults = displayResults;
+        displayResults = function(data) {
+            originalData = [...data.data]; // Store original data
+            originalDisplayResults(data);
+        };
+
         // Auto-analyze on page load with default values
         window.addEventListener('load', function() {
             setTimeout(() => {
