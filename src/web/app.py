@@ -11,7 +11,6 @@ from flask import Flask, render_template, request, jsonify, send_file
 from datetime import datetime
 import csv
 import io
-# ML imports
 import json
 import pandas as pd
 
@@ -23,9 +22,6 @@ sys.path.insert(0, src_dir)
 from services.analyzer import CuratorAnalyzer
 from utils.validators import InputValidator
 from config.settings import DEFAULT_USERNAME, DEFAULT_DAYS_BACK
-# ML imports
-from ml.experiments import MLExperimentRunner
-from ml.feature_extractor import CuratorMLFeatureExtractor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -35,8 +31,6 @@ app = Flask(__name__)
 
 # Global analyzer instance
 analyzer = None
-# Global ML runner instance
-ml_runner = None
 
 def get_analyzer():
     """Get or create analyzer instance"""
@@ -44,13 +38,6 @@ def get_analyzer():
     if analyzer is None:
         analyzer = CuratorAnalyzer()
     return analyzer
-
-def get_ml_runner():
-    """Get or create ML runner instance"""
-    global ml_runner
-    if ml_runner is None:
-        ml_runner = MLExperimentRunner()
-    return ml_runner
 
 def calculate_efficiency(vote_value_steem, reward_sp):
     """Calculate efficiency percentage between vote value and actual reward"""
@@ -264,9 +251,8 @@ def health_check():
             'error': str(e)
         }), 503
 
-# ========== ML ENDPOINTS ==========
-
-@app.route('/ml/feature_extraction', methods=['POST'])
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
 def ml_feature_extraction():
     """Run ML feature extraction on curator data"""
     try:

@@ -1,6 +1,6 @@
 # Steem Curator Analyzer
 
-Un potente strumento per analizzare l'attività di curation su Steem e preparare dati per modelli di machine learning.
+Un potente strumento per analizzare l'attività di curation su Steem.
 
 ## 🚀 Caratteristiche
 
@@ -8,7 +8,7 @@ Un potente strumento per analizzare l'attività di curation su Steem e preparare
 - **Dati temporali dettagliati**: Include minuto, ora e giorno della settimana dei voti
 - **Metriche dei post**: Analizza lunghezza, categoria, tag, payout e engagement
 - **Interfaccia web moderna**: Dashboard intuitiva con visualizzazione tabellare
-- **Esportazione CSV**: Dati pronti per l'analisi in machine learning
+- **Esportazione CSV**: Dati pronti per l'analisi successiva
 - **Nodi multipli**: Utilizza diversi nodi Steem per alta disponibilità
 
 ## 🛠 Installazione
@@ -78,18 +78,12 @@ Il tool utilizza automaticamente questi nodi in ordine di priorità:
 - **Tempo tra voto e reward**: In giorni e ore
 - **Pattern di attività**: Orari e giorni preferiti per votare
 
-## 🤖 Preparazione per Machine Learning
+## 📊 Analisi Dati
 
-I dati esportati includono features numeriche e categoriche pronte per:
-- **Classificazione**: Predire il successo di un post
-- **Regressione**: Stimare il payout futuro
-- **Clustering**: Identificare pattern di comportamento
-- **Time Series**: Analizzare trend temporali
-
-### Features Principali
-- Variabili numeriche: 12+ features (ricompense, payout, lunghezza, ecc.)
-- Variabili categoriche: 8+ features (autore, categoria, tag, ecc.)
-- Variabili temporali: 5+ features (ora, minuto, giorno, ecc.)
+I dati esportati includono dettagli completi sui voti e le ricompense di curation:
+- **Analisi temporale**: Quando è stato piazzato il voto e quando è arrivata la ricompensa
+- **Analisi di efficienza**: Rapporto tra valore del voto e ricompensa effettiva
+- **Metriche di performance**: Statistiche aggregate sulla performance di curation
 
 ## 📋 Esempio di Output
 
